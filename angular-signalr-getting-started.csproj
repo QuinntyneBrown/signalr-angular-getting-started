@@ -148,6 +148,7 @@
     <Content Include="wwwroot\app\components\app.js" />
     <Content Include="wwwroot\app\components\chat.js" />
     <Content Include="wwwroot\app\components\register.js" />
+    <Content Include="wwwroot\app\hubs\chat.js" />
     <Content Include="wwwroot\app\metal\dispatcher.js" />
     <Content Include="wwwroot\app\metal\fetch.js" />
     <Content Include="wwwroot\app\metal\guid.js" />

@@ -8,7 +8,7 @@ namespace angular_signalr_getting_started.Hubs
     {
         public void Send(string name, string message)
         {
-            Clients.All.broadcastMessage(name, message);
+            Clients.All.broadcastMessage(new { name = name, message = message });
         }
     }
 }

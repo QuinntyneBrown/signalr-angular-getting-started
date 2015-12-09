@@ -75,16 +75,21 @@
 
     "use strict";
 
-    function ChatComponent() {
+    function ChatComponent(chatHub, dispatcher) {
         var self = this;
+        self.chatHubInstance = chatHub.getInstance();
+        self.send = function () {
+            if(chatHub.started)
+                self.chatHubInstance.invoke("send", currentUser.username, self.message);
+        }
 
         return self;
     }
 
     ngX.Component({
         component: ChatComponent,
-        route: "/chat",
-        providers: [],
+        route: "/register",
+        providers: ["chatHub", "currentUser", "dispatcher"],
         template: [
             "<div class='chatComponent'>",
             "</div>"
@@ -96,8 +101,26 @@
 
     "use strict";
 
-    function RegisterComponent() {
+    function RegisterComponent(chatHub, dispatcher) {
         var self = this;
+
+        self.chatHub = chatHub.getInstance();
+
+        if (!chatHub.started) {
+            var listenerId = dispatcher.addListener({
+                actionType: "CHAT_HUB_STARTED", callback: function () {
+                    self.chatHub.invoke("send", "Quinn", "Message");
+                    dispatcher.removeListener({ id: listenerId });
+                }
+            });
+        } else {
+            self.chatHub.invoke("send", "Quinn", "Message");
+        }
+
+
+        self.send = function () {
+            
+        }
 
         return self;
     }
@@ -105,13 +128,39 @@
     ngX.Component({
         component: RegisterComponent,
         route: "/register",
-        providers: [],
+        providers: ["chatHub","dispatcher"],
         template: [
             "<div class='registerComponent'>",
             "</div>"
         ].join(" ")
     });
 
+})();
+(function () {
+    "use strict";
+
+    function chatHub($,dispatcher) {
+        var self = this;
+        self.$ = $;
+        self.dispatcher = dispatcher;
+        self.started = false;
+        self._instance = null;
+        self.getInstance = function () {
+            if (!self._instance) {
+                self.connection = self.$.hubConnection();
+                self._instance = self.connection.createHubProxy("chatHub");
+                self.connection.start({ transport: 'longPolling' }, function () {
+                    self.started = true;
+                    self.dispatcher.emit({ actionType: "CHAT_HUB_STARTED" });
+                });
+            } 
+            return self._instance;
+        }
+
+        return self;
+    }
+
+    angular.module("app").service("chatHub", ["$", "dispatcher", chatHub]);
 })();
 (function () {
 
@@ -297,21 +346,17 @@ angular.module("app").value("$", $);
 })();
 (function () {
 
-    function chatStore($, dispatcher, CHAT_ACTIONS, store) {
+    function chatStore(dispatcher, CHAT_ACTIONS, chatHub, store) {
 
         var self = this;
         self._storeInstance = null;
         self.dispatcher = dispatcher;
         self.store = store;
-        self.$ = $;
-        self.connection = self.$.hubConnection();
-        self.hub = self.connection.createHubProxy("chatHub");
-        self.hub.on("onMessageAdded", function (options) {
-            self.storeInstance.addOrUpdate({ data: options });
-            self.storeInstance.emitChange();
-        });
-        self.connection.start({ transport: 'longPolling' }, function () {
+        self.chatHub = chatHub.getInstance();
 
+        self.chatHub.on("broadcastMessage", function (options) {
+            alert("Works");
+            self.storeInstance.emitChange({ options: options });
         });
 
         self.dispatcher.addListener({
@@ -353,5 +398,6 @@ angular.module("app").value("$", $);
     }
 
 
-    angular.module("app").service(["$", "dispatcher", "CHAT_ACTIONS", "store", chatStore]);
+    angular.module("app").service("chatStore",["dispatcher", "CHAT_ACTIONS", "chatHub","store", chatStore])
+    .run(["chatStore", function (chatStore) { }]);
 })();
