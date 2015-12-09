@@ -3,7 +3,6 @@
     "use strict";
 
     function userStore(dispatcher, USER_ACTIONS, store) {
-
         var self = this;
         self._storeInstance = null;
         self.dispatcher = dispatcher;
@@ -33,7 +32,6 @@
 
         return self;
     }
-
 
     angular.module("app").service("userStore", ["dispatcher", "USER_ACTIONS", "store", userStore])
     .run(["userStore", function (userStore) { }]);

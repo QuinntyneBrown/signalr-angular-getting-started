@@ -2,13 +2,17 @@
 
     "use strict";
 
-    function ChatComponent(chatActions, currentUser, dispatcher) {
+    function ChatComponent($scope,chatActions, chatStore, currentUser, dispatcher) {
         var self = this;
         self.chatActions = chatActions;
+        self.chatStore = chatStore;
         self.dispatcher = dispatcher;
         self.currentUser = currentUser;
         self.message = null;
-        self.messages = [];
+       
+        Object.defineProperty(self, "messages", {
+            "get": function () { return self.chatStore.items }
+        });
 
         self.send = function () {
             self.chatActions.send({ username: self.currentUser.username, message: self.message });
@@ -18,7 +22,7 @@
         self.listenerId = self.dispatcher.addListener({
             actionType: "CHANGE",
             callback: function (options) {
-                self.messages.push(options.data);
+                $scope.$digest();
             }
         });
 
@@ -32,7 +36,7 @@
     ngX.Component({
         component: ChatComponent,
         route: "/register",
-        providers: ["chatActions", "currentUser", "dispatcher"],
+        providers: ["$scope","chatActions", "chatStore", "currentUser", "dispatcher"],
         template: [
             "<div class='chatComponent'>",
             "</div>"
