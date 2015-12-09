@@ -6,9 +6,9 @@ namespace angular_signalr_getting_started.Hubs
     [HubName("chatHub")]
     public class ChatHub : Hub
     {
-        public void Send(string name, string message)
+        public void Send(string username, string message)
         {
-            Clients.All.broadcastMessage(new { name = name, message = message });
+            Clients.All.broadcastMessage(new { username = username, message = message });
         }
     }
 }

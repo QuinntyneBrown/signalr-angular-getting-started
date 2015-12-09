@@ -22,32 +22,57 @@
     "use strict";
 
     angular.module("app").value("CHAT_ACTIONS", {
-        SEND: "SEND",
-        REGISTER: "REGISTER"
+        SEND: "SEND"
     });
 
-    function chatActions(CHAT_ACTIONS, dispatcher, guid) {
+    function chatActions(CHAT_ACTIONS, chatHub, dispatcher, guid) {
         var self = this;
         self.CHAT_ACTIONS = CHAT_ACTIONS;
         self.dispatcher = dispatcher;
         self.guid = guid;
+        self.chatHubInstance = chatHub.getInstance();
 
         self.send = function (options) {
             var newGuid = self.guid();
-
-            return newGuid;
-        }
-
-        self.register = function (options) {
-            var newGuid = self.guid();
-
+            self.chatHubInstance.invoke("send", options.username, options.message);
             return newGuid;
         }
 
         return self;
     }
 
-    angular.module("app").service("chatActions", ["CHAT_ACTIONS","dispatcher","guid",chatActions]);
+    angular.module("app").service("chatActions", ["CHAT_ACTIONS","chatHub","dispatcher","guid",chatActions]);
+
+})();
+(function () {
+
+    "use strict";
+
+    angular.module("app").value("USER_ACTIONS", {
+        REGISTER: "REGISTER"
+    });
+
+    function userActions(USER_ACTIONS, dispatcher, guid) {
+        var self = this;
+        self.USER_ACTIONS = USER_ACTIONS;
+        self.dispatcher = dispatcher;
+        self.guid = guid;
+
+        self.register = function (options) {
+            var newGuid = self.guid();
+            self.dispatcher.emit({
+                actionType: self.USER_ACTIONS.REGISTER, options: {
+                    id: options ? options.id : null,
+                    data: options ? options.data :null
+                }
+            })
+            return newGuid;
+        }
+
+        return self;
+    }
+
+    angular.module("app").service("userActions", ["USER_ACTIONS", "dispatcher", "guid", userActions]);
 
 })();
 (function () {
@@ -75,12 +100,36 @@
 
     "use strict";
 
-    function ChatComponent(chatHub, dispatcher) {
+    function ChatComponent($location, $scope,chatActions, chatStore, userStore, dispatcher) {
         var self = this;
-        self.chatHubInstance = chatHub.getInstance();
+        self.chatActions = chatActions;
+        self.chatStore = chatStore;
+        self.dispatcher = dispatcher;
+        self.currentUser = userStore.currentUser;
+
+        if (!self.currentUser)
+            $location.path("/");
+
+        self.message = null;
+       
+        Object.defineProperty(self, "messages", {
+            "get": function () { return self.chatStore.items }
+        });
+
         self.send = function () {
-            if(chatHub.started)
-                self.chatHubInstance.invoke("send", currentUser.username, self.message);
+            self.chatActions.send({ username: self.currentUser.username, message: self.message });
+            self.message = null;
+        }
+
+        self.listenerId = self.dispatcher.addListener({
+            actionType: "CHANGE",
+            callback: function (options) {
+                $scope.$digest();
+            }
+        });
+
+        self.deactivate = function () {
+            self.dispatcher.removeListener({ id: self.listenerId });
         }
 
         return self;
@@ -88,10 +137,18 @@
 
     ngX.Component({
         component: ChatComponent,
-        route: "/register",
-        providers: ["chatHub", "currentUser", "dispatcher"],
+        route: "/chat",
+        providers: ["$location", "$scope", "chatActions", "chatStore", "userStore", "dispatcher"],
         template: [
             "<div class='chatComponent'>",
+
+            "   <div>",
+            "       <input placeholder='Enter Message' type='text' data-ng-model='vm.message' /> ",
+            "       <button data-ng-click='vm.send()'>Submit</button> ",
+            "   </div>",
+
+            "   <message-list></message-list>",
+
             "</div>"
         ].join(" ")
     });
@@ -101,25 +158,83 @@
 
     "use strict";
 
-    function RegisterComponent(chatHub, dispatcher) {
-        var self = this;
+    ngX.Component({
+        selector: "message-list",
+        component: function MessageListComponent(dispatcher, chatStore) {
+            var self = this;
+            self.dispatcher = dispatcher;
+            self.chatStore = chatStore;
+            self.messages = self.chatStore.items;
+            self.onInit = function () {
 
-        self.chatHub = chatHub.getInstance();
+            }
 
-        if (!chatHub.started) {
-            var listenerId = dispatcher.addListener({
-                actionType: "CHAT_HUB_STARTED", callback: function () {
-                    self.chatHub.invoke("send", "Quinn", "Message");
-                    dispatcher.removeListener({ id: listenerId });
+            self.listenerId = self.dispatcher.addListener({
+                actionType: "CHANGE",
+                callback: function () {
+                    self.messages = self.chatStore.items;
                 }
             });
-        } else {
-            self.chatHub.invoke("send", "Quinn", "Message");
+
+            self.dispose = function () {
+                self.dispatcher.removeListener({ id: self.listenerId });
+            }
+
+            return self;
+        },
+        styles: [
+            " .messageList { ",
+            " } ",
+
+            " .messageListItem { ",
+            " } "
+
+        ].join(" /n "),
+        providers: ["dispatcher","chatStore"],
+        template: [
+            "<div class='messageList'>",
+            "<div class='messageListItem' data-ng-repeat='messageItem in vm.messages'>",
+            "{{ ::messageItem.username }} : {{ ::messageItem.message }}",
+            "</div>",
+            "</div>"
+        ].join(" ")
+    });
+
+})();
+(function () {
+
+    "use strict";
+
+    function RegisterComponent($location, dispatcher, userActions, userStore) {
+        var self = this;
+        self.$location = $location;
+        self.dispatcher = dispatcher;
+        self.userActions = userActions;
+        self.userStore = userStore;
+        self.username = null;
+
+        if (self.userStore.currentUser && self.userStore.currentUser.username)
+            self.$location.path("/chat");
+
+        self.register = function () {
+            self.actionId = self.userActions.register({
+                data: {
+                    username: self.username
+                }
+            });
         }
 
+        self.listenerId = self.dispatcher.addListener({
+            actionType: "CHANGE",
+            callback: function (options) {
+                if (options.id === self.actionId) {
+                    $location.path("/chat");
+                }
+            }
+        });
 
-        self.send = function () {
-            
+        self.deactivate = function () {
+            self.dispatcher.removeListener({ id: self.listenerId });
         }
 
         return self;
@@ -127,10 +242,12 @@
 
     ngX.Component({
         component: RegisterComponent,
-        route: "/register",
-        providers: ["chatHub","dispatcher"],
+        route: "/",
+        providers: ["$location", "dispatcher", "userActions", "userStore"],
         template: [
             "<div class='registerComponent'>",
+            "   <input type='text' placeholder='Enter Username' data-ng-model='vm.username'></input>",
+            "   <button data-ng-click='vm.register()'>Submit</button> ",
             "</div>"
         ].join(" ")
     });
@@ -347,7 +464,6 @@ angular.module("app").value("$", $);
 (function () {
 
     function chatStore(dispatcher, CHAT_ACTIONS, chatHub, store) {
-
         var self = this;
         self._storeInstance = null;
         self.dispatcher = dispatcher;
@@ -355,16 +471,8 @@ angular.module("app").value("$", $);
         self.chatHub = chatHub.getInstance();
 
         self.chatHub.on("broadcastMessage", function (options) {
-            alert("Works");
+            self.items.push(options);
             self.storeInstance.emitChange({ options: options });
-        });
-
-        self.dispatcher.addListener({
-            actionType: CHAT_ACTIONS.REGISTER,
-            callback: function (options) {
-                self.storeInstance.addOrUpdate({ data: options.data });
-                self.storeInstance.emitChange({ id: options.id });
-            }
         });
 
         self.dispatcher.addListener({
@@ -387,17 +495,50 @@ angular.module("app").value("$", $);
             }
         });
 
-        Object.defineProperty(self, "items", {
-            "get": function () { return self.storeInstance.items; }
-        });
+        self.items = [];
 
-        self.getById = function (id) {
-            return self.storeInstance.getById(int);
-        }
         return self;
     }
 
 
     angular.module("app").service("chatStore",["dispatcher", "CHAT_ACTIONS", "chatHub","store", chatStore])
     .run(["chatStore", function (chatStore) { }]);
+})();
+(function () {
+
+    "use strict";
+
+    function userStore(dispatcher, USER_ACTIONS, store) {
+        var self = this;
+        self._storeInstance = null;
+        self.dispatcher = dispatcher;
+        self.store = store;
+        
+        self.dispatcher.addListener({
+            actionType: USER_ACTIONS.REGISTER,
+            callback: function (options) {
+                self.currentUser = options.data;
+                self.storeInstance.emitChange({ id: options.id });
+            }
+        });
+
+        Object.defineProperty(self, "storeInstance", {
+            "get": function () {
+                if (!self._storeInstance) {
+                    self._storeInstance = self.store.createInstance();
+                    return self._storeInstance;
+                }
+                else {
+                    return self._storeInstance;
+                }
+            }
+        });
+
+        self.currentUser = null;
+
+        return self;
+    }
+
+    angular.module("app").service("userStore", ["dispatcher", "USER_ACTIONS", "store", userStore])
+    .run(["userStore", function (userStore) { }]);
 })();

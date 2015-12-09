@@ -8,6 +8,7 @@
         self.chatHub = chatHub.getInstance();
 
         self.chatHub.on("broadcastMessage", function (options) {
+            self.items.push(options);
             self.storeInstance.emitChange({ options: options });
         });
 
@@ -31,9 +32,7 @@
             }
         });
 
-        Object.defineProperty(self, "items", {
-            "get": function () { return self.storeInstance.items; }
-        });
+        self.items = [];
 
         return self;
     }

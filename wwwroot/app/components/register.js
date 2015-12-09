@@ -2,11 +2,13 @@
 
     "use strict";
 
-    function RegisterComponent($location,dispatcher, userStore) {
+    function RegisterComponent($location, dispatcher, userActions, userStore) {
         var self = this;
         self.$location = $location;
         self.dispatcher = dispatcher;
+        self.userActions = userActions;
         self.userStore = userStore;
+        self.username = null;
 
         if (self.userStore.currentUser && self.userStore.currentUser.username)
             self.$location.path("/chat");
@@ -20,7 +22,7 @@
         }
 
         self.listenerId = self.dispatcher.addListener({
-            actionType: "",
+            actionType: "CHANGE",
             callback: function (options) {
                 if (options.id === self.actionId) {
                     $location.path("/chat");
@@ -38,9 +40,11 @@
     ngX.Component({
         component: RegisterComponent,
         route: "/",
-        providers: ["$location","dispatcher","userStore"],
+        providers: ["$location", "dispatcher", "userActions", "userStore"],
         template: [
             "<div class='registerComponent'>",
+            "   <input type='text' placeholder='Enter Username' data-ng-model='vm.username'></input>",
+            "   <button data-ng-click='vm.register()'>Submit</button> ",
             "</div>"
         ].join(" ")
     });
