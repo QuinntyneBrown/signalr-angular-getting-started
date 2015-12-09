@@ -5,9 +5,6 @@
     ngX.Component({
         selector: "app",
         component: function AppComponent() {
-            var self = this;
-
-            return self;
         },
         template: [
             "<div class='app'>",
@@ -16,6 +13,4 @@
             "</div>"
         ].join(" ")
     });
-
-
 })();

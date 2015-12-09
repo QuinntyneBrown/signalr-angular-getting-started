@@ -2,16 +2,18 @@
 
     "use strict";
 
-    function userStore(dispatcher, USER_ACTIONS, store) {
+    function userStore(dispatcher, localStorageManager, securityStore, store, USER_ACTIONS) {
         var self = this;
         self._storeInstance = null;
         self.dispatcher = dispatcher;
         self.store = store;
+        self.securityStore = securityStore;
         
         self.dispatcher.addListener({
             actionType: USER_ACTIONS.REGISTER,
             callback: function (options) {
-                self.currentUser = options.data;
+                self.securityStore.currentUser = options.data;
+                self.securityStore.token = "DUMMY_AUTH_TOKEN";
                 self.storeInstance.emitChange({ id: options.id });
             }
         });
@@ -28,11 +30,13 @@
             }
         });
 
-        self.currentUser = null;
+        Object.defineProperty(self, "currentUser", {
+            "get": function () { return self.securityStore.currentUser; }
+        });
 
         return self;
     }
 
-    angular.module("app").service("userStore", ["dispatcher", "USER_ACTIONS", "store", userStore])
+    angular.module("app").service("userStore", ["dispatcher", "localStorageManager", "securityStore", "store", "USER_ACTIONS", userStore])
     .run(["userStore", function (userStore) { }]);
 })();

@@ -3,45 +3,29 @@
     "use strict";
 
     angular.module("app", ["ngX"]).config(["$routeProvider", function ($routeProvider) {
-
         $routeProvider.when("/chat", {
-            "componentName": "chatComponent"
+            "componentName": "chatComponent",
+            "autorizationRequired": true
         });
-
         $routeProvider.when("/", {
             "componentName": "registerComponent"
         });
-
     }]);
-
-
-
 })();
 (function () {
 
     "use strict";
 
-    angular.module("app").value("CHAT_ACTIONS", {
-        SEND: "SEND"
-    });
-
-    function chatActions(CHAT_ACTIONS, chatHub, dispatcher, guid) {
+    function chatActions(chatHub) {
         var self = this;
-        self.CHAT_ACTIONS = CHAT_ACTIONS;
-        self.dispatcher = dispatcher;
-        self.guid = guid;
         self.chatHubInstance = chatHub.getInstance();
-
         self.send = function (options) {
-            var newGuid = self.guid();
             self.chatHubInstance.invoke("send", options.username, options.message);
-            return newGuid;
         }
-
         return self;
     }
 
-    angular.module("app").service("chatActions", ["CHAT_ACTIONS","chatHub","dispatcher","guid",chatActions]);
+    angular.module("app").service("chatActions", ["chatHub",chatActions]);
 
 })();
 (function () {
@@ -82,9 +66,6 @@
     ngX.Component({
         selector: "app",
         component: function AppComponent() {
-            var self = this;
-
-            return self;
         },
         template: [
             "<div class='app'>",
@@ -93,52 +74,27 @@
             "</div>"
         ].join(" ")
     });
-
-
 })();
 (function () {
 
     "use strict";
 
-    function ChatComponent($location, $scope,chatActions, chatStore, userStore, dispatcher) {
+    function ChatComponent(chatActions, userStore) {
         var self = this;
         self.chatActions = chatActions;
-        self.chatStore = chatStore;
-        self.dispatcher = dispatcher;
         self.currentUser = userStore.currentUser;
-
-        if (!self.currentUser)
-            $location.path("/");
-
-        self.message = null;
-       
-        Object.defineProperty(self, "messages", {
-            "get": function () { return self.chatStore.items }
-        });
-
+        self.message = null;      
         self.send = function () {
             self.chatActions.send({ username: self.currentUser.username, message: self.message });
             self.message = null;
         }
-
-        self.listenerId = self.dispatcher.addListener({
-            actionType: "CHANGE",
-            callback: function (options) {
-                $scope.$digest();
-            }
-        });
-
-        self.deactivate = function () {
-            self.dispatcher.removeListener({ id: self.listenerId });
-        }
-
         return self;
     }
 
     ngX.Component({
         component: ChatComponent,
         route: "/chat",
-        providers: ["$location", "$scope", "chatActions", "chatStore", "userStore", "dispatcher"],
+        providers: ["chatActions", "userStore"],
         template: [
             "<div class='chatComponent'>",
 
@@ -160,25 +116,21 @@
 
     ngX.Component({
         selector: "message-list",
-        component: function MessageListComponent(dispatcher, chatStore) {
+        component: function MessageListComponent($scope, dispatcher, chatStore) {
             var self = this;
             self.dispatcher = dispatcher;
             self.chatStore = chatStore;
             self.messages = self.chatStore.items;
-            self.onInit = function () {
-
-            }
 
             self.listenerId = self.dispatcher.addListener({
                 actionType: "CHANGE",
                 callback: function () {
                     self.messages = self.chatStore.items;
+                    $scope.$digest();
                 }
             });
 
-            self.dispose = function () {
-                self.dispatcher.removeListener({ id: self.listenerId });
-            }
+            self.dispose = function () { self.dispatcher.removeListener({ id: self.listenerId }); }
 
             return self;
         },
@@ -190,7 +142,7 @@
             " } "
 
         ].join(" /n "),
-        providers: ["dispatcher","chatStore"],
+        providers: ["$scope", "dispatcher", "chatStore"],
         template: [
             "<div class='messageList'>",
             "<div class='messageListItem' data-ng-repeat='messageItem in vm.messages'>",
@@ -205,16 +157,12 @@
 
     "use strict";
 
-    function RegisterComponent($location, dispatcher, userActions, userStore) {
+    function RegisterComponent($location, dispatcher, userActions) {
         var self = this;
         self.$location = $location;
         self.dispatcher = dispatcher;
         self.userActions = userActions;
-        self.userStore = userStore;
         self.username = null;
-
-        if (self.userStore.currentUser && self.userStore.currentUser.username)
-            self.$location.path("/chat");
 
         self.register = function () {
             self.actionId = self.userActions.register({
@@ -243,7 +191,7 @@
     ngX.Component({
         component: RegisterComponent,
         route: "/",
-        providers: ["$location", "dispatcher", "userActions", "userStore"],
+        providers: ["$location", "dispatcher", "userActions"],
         template: [
             "<div class='registerComponent'>",
             "   <input type='text' placeholder='Enter Username' data-ng-model='vm.username'></input>",
@@ -256,10 +204,9 @@
 (function () {
     "use strict";
 
-    function chatHub($,dispatcher) {
+    function chatHub($) {
         var self = this;
         self.$ = $;
-        self.dispatcher = dispatcher;
         self.started = false;
         self._instance = null;
         self.getInstance = function () {
@@ -267,8 +214,7 @@
                 self.connection = self.$.hubConnection();
                 self._instance = self.connection.createHubProxy("chatHub");
                 self.connection.start({ transport: 'longPolling' }, function () {
-                    self.started = true;
-                    self.dispatcher.emit({ actionType: "CHAT_HUB_STARTED" });
+
                 });
             } 
             return self._instance;
@@ -277,7 +223,7 @@
         return self;
     }
 
-    angular.module("app").service("chatHub", ["$", "dispatcher", chatHub]);
+    angular.module("app").service("chatHub", ["$", chatHub]);
 })();
 (function () {
 
@@ -323,94 +269,6 @@
     angular.module("app").service("dispatcher", ["guid", eventEmitter]);
 
 })();
-(function () {
-
-    "use strict";
-
-    function fetch($http, $q, localStorageManager) {
-
-        var self = this;
-        self.$http = $http;
-        self.$q = $q;
-        self.localStorageManager = localStorageManager;
-
-        self.inMemoryCache = {};
-
-        self.fromCacheOrService = function (options) {
-            var deferred = self.$q.defer();
-            var cachedData = self.localStorageManager.get(self.getCacheKey(options));
-            if (!cachedData) {
-                self.fromService(options).then( function (results) {
-                    deferred.resolve(results);
-                }).catch(function (error) {
-                    deferred.reject(error);
-                });
-            } else {
-                deferred.resolve(cachedData.value);
-            }
-            return deferred.promise;
-        }
-
-        self.fromInMemoryCacheOrService = function (options) {
-            var deferred = self.$q.defer();
-
-            var cachedData = self.inMemoryCache[self.getCacheKey(options)];
-
-            if (!cachedData) {
-                self.$http({ method: options.method, url: options.url, data: options.data, params: options.params }).then( function (results) {
-                    self.inMemoryCache[self.getCacheKey(options)] = results;
-                    deferred.resolve(results);
-                }).catch( function (error) {
-                    deferred.reject(error);
-                });
-            } else {
-                deferred.resolve(cachedData);
-            }
-            return deferred.promise;
-        }
-
-        self.fromService = function (options) {
-            var deferred = self.$q.defer();
-
-            self.$http({ method: options.method, url: options.url, data: options.data, params: options.params }).then( function (results) {
-                deferred.resolve(results);
-            }).catch(function (error) {
-                deferred.reject(error);
-            });
-
-            return deferred.promise;
-        }
-
-        self.getCacheKey = function (options) {
-            return options.key || options.url + JSON.stringify(options.params) + JSON.stringify(options.data);
-        }
-
-        self.invalidateCache = function (cacheKey) {
-            //TODO= Implement
-        }
-
-        return self;
-    }
-
-    angular.module("app").service("fetch", ["$http","$q","localStorageManager",fetch]);
-
-})();
-(function () {
-
-
-    function guid() {
-        function s4() {
-            return Math.floor((1 + Math.random()) * 0x10000)
-                .toString(16)
-                .substring(1);
-        }
-        return s4() + s4() + '-' + s4() + '-' + s4() + '-' +
-            s4() + '-' + s4() + s4() + s4();
-    }
-
-    angular.module("app").value("guid", guid);
-
-})();
 angular.module("app").value("$", $);
 (function () {
 
@@ -435,12 +293,16 @@ angular.module("app").value("$", $);
 
         self.addOrUpdate = function (options) {
             var exists = false;
-            for (var i = 0; i < self.items.length; i++) {
-                if (self.items[i].id === options.data.id) {
-                    exists = true;
-                    self.items[i] = options.data;
+
+            if (options.data.id) {
+                for (var i = 0; i < self.items.length; i++) {
+                    if (self.items[i].id === options.data.id) {
+                        exists = true;
+                        self.items[i] = options.data;
+                    }
                 }
             }
+
             if (!exists)
                 self.items.push(options.data);
         }
@@ -463,24 +325,15 @@ angular.module("app").value("$", $);
 })();
 (function () {
 
-    function chatStore(dispatcher, CHAT_ACTIONS, chatHub, store) {
+    function chatStore(chatHub, store) {
         var self = this;
         self._storeInstance = null;
-        self.dispatcher = dispatcher;
         self.store = store;
         self.chatHub = chatHub.getInstance();
 
-        self.chatHub.on("broadcastMessage", function (options) {
-            self.items.push(options);
-            self.storeInstance.emitChange({ options: options });
-        });
-
-        self.dispatcher.addListener({
-            actionType: CHAT_ACTIONS.SEND,
-            callback: function (options) {
-                self.storeInstance.addOrUpdate({ data: options.data });
-                self.storeInstance.emitChange({ id: options.id });
-            }
+        self.chatHub.on("broadcastMessage", function (results) {
+            self.storeInstance.addOrUpdate({ data: results });
+            self.storeInstance.emitChange();
         });
 
         Object.defineProperty(self, "storeInstance", {
@@ -495,29 +348,31 @@ angular.module("app").value("$", $);
             }
         });
 
-        self.items = [];
+        Object.defineProperty(self, "items", { "get": function () { return self.storeInstance.items; } });
 
         return self;
     }
 
 
-    angular.module("app").service("chatStore",["dispatcher", "CHAT_ACTIONS", "chatHub","store", chatStore])
+    angular.module("app").service("chatStore",["chatHub","store", chatStore])
     .run(["chatStore", function (chatStore) { }]);
 })();
 (function () {
 
     "use strict";
 
-    function userStore(dispatcher, USER_ACTIONS, store) {
+    function userStore(dispatcher, localStorageManager, securityStore, store, USER_ACTIONS) {
         var self = this;
         self._storeInstance = null;
         self.dispatcher = dispatcher;
         self.store = store;
+        self.securityStore = securityStore;
         
         self.dispatcher.addListener({
             actionType: USER_ACTIONS.REGISTER,
             callback: function (options) {
-                self.currentUser = options.data;
+                self.securityStore.currentUser = options.data;
+                self.securityStore.token = "DUMMY_AUTH_TOKEN";
                 self.storeInstance.emitChange({ id: options.id });
             }
         });
@@ -534,11 +389,13 @@ angular.module("app").value("$", $);
             }
         });
 
-        self.currentUser = null;
+        Object.defineProperty(self, "currentUser", {
+            "get": function () { return self.securityStore.currentUser; }
+        });
 
         return self;
     }
 
-    angular.module("app").service("userStore", ["dispatcher", "USER_ACTIONS", "store", userStore])
+    angular.module("app").service("userStore", ["dispatcher", "localStorageManager", "securityStore", "store", "USER_ACTIONS", userStore])
     .run(["userStore", function (userStore) { }]);
 })();

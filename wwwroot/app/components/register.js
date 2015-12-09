@@ -2,16 +2,12 @@
 
     "use strict";
 
-    function RegisterComponent($location, dispatcher, userActions, userStore) {
+    function RegisterComponent($location, dispatcher, userActions) {
         var self = this;
         self.$location = $location;
         self.dispatcher = dispatcher;
         self.userActions = userActions;
-        self.userStore = userStore;
         self.username = null;
-
-        if (self.userStore.currentUser && self.userStore.currentUser.username)
-            self.$location.path("/chat");
 
         self.register = function () {
             self.actionId = self.userActions.register({
@@ -40,7 +36,7 @@
     ngX.Component({
         component: RegisterComponent,
         route: "/",
-        providers: ["$location", "dispatcher", "userActions", "userStore"],
+        providers: ["$location", "dispatcher", "userActions"],
         template: [
             "<div class='registerComponent'>",
             "   <input type='text' placeholder='Enter Username' data-ng-model='vm.username'></input>",

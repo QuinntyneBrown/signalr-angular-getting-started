@@ -21,12 +21,16 @@
 
         self.addOrUpdate = function (options) {
             var exists = false;
-            for (var i = 0; i < self.items.length; i++) {
-                if (self.items[i].id === options.data.id) {
-                    exists = true;
-                    self.items[i] = options.data;
+
+            if (options.data.id) {
+                for (var i = 0; i < self.items.length; i++) {
+                    if (self.items[i].id === options.data.id) {
+                        exists = true;
+                        self.items[i] = options.data;
+                    }
                 }
             }
+
             if (!exists)
                 self.items.push(options.data);
         }

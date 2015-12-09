@@ -142,7 +142,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="libs\ngX.js" />
+    <Content Include="lib\ngX.js" />
     <Content Include="wwwroot\app\actions\chat-actions.js" />
     <Content Include="dist\app.js" />
     <Content Include="wwwroot\app\actions\user-actions.js" />
@@ -150,26 +150,24 @@
     <Content Include="wwwroot\app\components\chat.js" />
     <Content Include="wwwroot\app\components\message-list.js" />
     <Content Include="wwwroot\app\components\register.js" />
-    <Content Include="wwwroot\app\hubs\chat.js" />
+    <Content Include="wwwroot\app\hubs\chat-hub.js" />
     <Content Include="wwwroot\app\metal\dispatcher.js" />
-    <Content Include="wwwroot\app\metal\fetch.js" />
-    <Content Include="wwwroot\app\metal\guid.js" />
     <Content Include="wwwroot\app\metal\jQuery.js" />
     <Content Include="wwwroot\app\metal\store.js" />
     <Content Include="wwwroot\app\stores\chat-store.js" />
     <Content Include="Global.asax" />
     <Content Include="gulpfile.config.js" />
     <Content Include="gulpfile.js" />
-    <Content Include="libs\angular-route.js" />
-    <Content Include="libs\angular.js" />
-    <Content Include="libs\jquery.js" />
-    <Content Include="libs\jquery.signalR-2.2.0.js" />
+    <Content Include="lib\angular-route.js" />
+    <Content Include="lib\angular.js" />
+    <Content Include="lib\jquery.js" />
+    <Content Include="lib\jquery.signalR-2.2.0.js" />
     <Content Include="packages.config">
       <SubType>Designer</SubType>
     </Content>
     <Content Include="Views\Shared\_Layout.cshtml" />
     <Content Include="Views\Default\Index.cshtml" />
-    <Content Include="wwwroot\app\app.component.js" />
+    <Content Include="wwwroot\app\app.module.js" />
     <Content Include="wwwroot\app\stores\user-store.js" />
     <None Include="Web.Debug.config">
       <DependentUpon>Web.config</DependentUpon>
